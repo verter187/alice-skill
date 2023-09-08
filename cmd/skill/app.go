@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bluegopher/alice-skill/internal/logger"
-	"github.com/bluegopher/alice-skill/internal/models"
-	"github.com/bluegopher/alice-skill/internal/store"
+	"github.com/wurt83ow/alice-skill/internal/logger"
+	"github.com/wurt83ow/alice-skill/internal/models"
+	"github.com/wurt83ow/alice-skill/internal/store"
 	"go.uber.org/zap"
 )
 

@@ -63,8 +63,10 @@ func run() error {
 		return err
 	}
 
-	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
-	// оборачиваем хендлер webhook в middleware с логированием
+	// создаём экземпляр приложения, пока без внешней зависимости хранилища сообщений
+	appInstance := newApp(nil)
 
-	return http.ListenAndServe(flagRunAddr, logger.RequestLogger(gzipMiddleware(webhook)))
+	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
+	// обернём хендлер webhook в middleware с логированием и поддержкой gzip
+	return http.ListenAndServe(flagRunAddr, logger.RequestLogger(gzipMiddleware(appInstance.webhook)))
 }
