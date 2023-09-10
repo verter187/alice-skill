@@ -2,12 +2,14 @@
 package main
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
-	"go.uber.org/zap"
-
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/wurt83ow/alice-skill/internal/logger"
+	"github.com/wurt83ow/alice-skill/internal/store/pg"
+	"go.uber.org/zap"
 )
 
 func gzipMiddleware(h http.HandlerFunc) http.HandlerFunc {
@@ -50,7 +52,6 @@ func gzipMiddleware(h http.HandlerFunc) http.HandlerFunc {
 
 // функция main вызывается автоматически при запуске приложения
 func main() {
-	// обрабатываем аргументы командной строки
 	parseFlags()
 
 	if err := run(); err != nil {
@@ -63,10 +64,16 @@ func run() error {
 		return err
 	}
 
-	// создаём экземпляр приложения, пока без внешней зависимости хранилища сообщений
-	appInstance := newApp(nil)
+	// создаём соединение к СУБД PostgreSQL с помощью аргумента командной строки
+	conn, err := sql.Open("pgx", flagDatabaseURI)
+	if err != nil {
+		return err
+	}
+
+	// создаём экземпляр приложения, передавая реализацию хранилища pg в качестве внешней зависимости
+	appInstance := newApp(pg.NewStore(conn))
 
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
-	// обернём хендлер webhook в middleware с логированием и поддержкой gzip
+	// обернём хендлер webhook в middleware с логгированием и поддержкой gzip
 	return http.ListenAndServe(flagRunAddr, logger.RequestLogger(gzipMiddleware(appInstance.webhook)))
 }
