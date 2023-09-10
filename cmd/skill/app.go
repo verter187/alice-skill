@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -51,7 +52,6 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 	var text string
 
 	switch true {
-	// пользователь попросил отправить сообщение
 	case strings.HasPrefix(req.Request.Command, "Отправь"):
 		// гипотетическая функция parseSendCommand вычленит из запроса логин адресата и текст сообщения
 		username, message := parseSendCommand(req.Request.Command)
@@ -79,7 +79,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		// Оповестим отправителя об успешности операции
 		text = "Сообщение успешно отправлено"
 
-	// пользователь попросил прочитать сообщение
+		// пользователь попросил прочитать сообщение
 	case strings.HasPrefix(req.Request.Command, "Прочитай"):
 		// гипотетическая функция parseSendCommand вычленит из запроса порядковый номер сообщения в списке доступных
 		messageIndex := parseReadCommand(req.Request.Command)
@@ -108,6 +108,28 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 
 			// передадим текст сообщения в ответе
 			text = fmt.Sprintf("Сообщение от %s, отправлено %s: %s", message.Sender, message.Time, message.Payload)
+		}
+
+	// пользователь хочет зарегистрироваться
+	case strings.HasPrefix(req.Request.Command, "Зарегистрируй"):
+		// гипотетическая функция parseRegisterCommand вычленит из запроса
+		// желаемое имя нового пользователя
+		username := parseRegisterCommand(req.Request.Command)
+
+		// регистрируем пользователя
+		err := a.store.RegisterUser(ctx, req.Session.User.UserID, username)
+		// наличие неспецифичной ошибки
+		if err != nil && !errors.Is(err, store.ErrConflict) {
+			logger.Log.Debug("cannot register user", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// определяем правильное ответное сообщение пользователю
+		text = fmt.Sprintf("Вы успешно зарегистрированы под именем %s", username)
+		if errors.Is(err, store.ErrConflict) {
+			// ошибка специфична для случая конфликта имён пользователей
+			text = "Извините, такое имя уже занято. Попробуйте другое."
 		}
 
 	// если не поняли команду, просто скажем пользовутелю сколько у него новых сообщений
@@ -143,7 +165,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// заполним модель ответа
+	// заполняем модель ответа
 	resp := models.Response{
 		Response: models.ResponsePayload{
 			Text: text, // Алиса проговорит текст
